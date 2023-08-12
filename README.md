@@ -4,11 +4,21 @@ Advent of Code 2019 in Rust
 
 ## Instructions
 
+### Run code
+
 Install [`cargo-aoc`](https://github.com/gobanos/cargo-aoc) CLI tool:
 
 ```zsh
 cargo install cargo-aoc
 ```
+
+Run the target day:
+
+```zsh
+cargo aoc -d <day>
+```
+
+### To download fresh input from AoC
 
 Authenticate with Advent of Code's token:
 
@@ -16,7 +26,7 @@ Authenticate with Advent of Code's token:
 cargo aoc credentials -s <token>
 ```
 
-Run the desired day:
+Run the target day:
 
 ```zsh
 cargo aoc -d <day>
