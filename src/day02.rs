@@ -11,7 +11,7 @@ pub fn parse_input(input: &str) -> Vec<u64> {
         .collect()
 }
 
-fn run(src: &[u64]) -> Vec<u64> {
+fn run(src: &[u64]) -> u64 {
     let mut res = src.to_owned();
     let mut pc: usize = 0;
 
@@ -36,17 +36,34 @@ fn run(src: &[u64]) -> Vec<u64> {
         }
     }
 
-    res
+    res[0]
+}
+
+fn run_with_input(input: &[u64], noun: u64, verb: u64) -> u64 {
+    let mut src = input.to_owned();
+    src[1] = noun;
+    src[2] = verb;
+
+    run(&src)
 }
 
 #[aoc(day2, part1)]
 pub fn solve_part1(input: &[u64]) -> u64 {
-    let mut src = input.to_owned();
-    src[1] = 12;
-    src[2] = 2;
+    run_with_input(input, 12, 2)
+}
 
-    let final_src = run(&src);
-    final_src[0]
+#[aoc(day2, part2)]
+pub fn solve_part2(input: &[u64]) -> u64 {
+    for noun in 0..=99 {
+        for verb in 0..=99 {
+            let output = run_with_input(input, noun, verb);
+            if output == 19690720 {
+                return noun * 100 + verb;
+            }
+        }
+    }
+
+    0
 }
 
 #[cfg(test)]
@@ -55,20 +72,14 @@ mod tests {
 
     #[test]
     fn test_run_example() {
-        assert_eq!(
-            run(&vec![1, 9, 10, 3, 2, 3, 11, 0, 99, 30, 40, 50]),
-            vec![3500, 9, 10, 70, 2, 3, 11, 0, 99, 30, 40, 50]
-        )
+        assert_eq!(run(&vec![1, 9, 10, 3, 2, 3, 11, 0, 99, 30, 40, 50]), 3500)
     }
 
     #[test]
     fn test_run_simple() {
-        assert_eq!(run(&vec![1, 0, 0, 0, 99]), vec![2, 0, 0, 0, 99]);
-        assert_eq!(run(&vec![2, 3, 0, 3, 99]), vec![2, 3, 0, 6, 99]);
-        assert_eq!(run(&vec![2, 4, 4, 5, 99, 0]), vec![2, 4, 4, 5, 99, 9801]);
-        assert_eq!(
-            run(&vec![1, 1, 1, 4, 99, 5, 6, 0, 99]),
-            vec![30, 1, 1, 4, 2, 5, 6, 0, 99]
-        );
+        assert_eq!(run(&vec![1, 0, 0, 0, 99]), 2);
+        assert_eq!(run(&vec![2, 3, 0, 3, 99]), 2);
+        assert_eq!(run(&vec![2, 4, 4, 5, 99, 0]), 2);
+        assert_eq!(run(&vec![1, 1, 1, 4, 99, 5, 6, 0, 99]), 30);
     }
 }
