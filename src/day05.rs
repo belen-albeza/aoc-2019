@@ -27,6 +27,7 @@ enum Opcode {
     Input,
     Output,
     JumpNotZero,
+    JumpZero,
 }
 
 impl TryFrom<i64> for Opcode {
@@ -38,6 +39,7 @@ impl TryFrom<i64> for Opcode {
             3 => Ok(Self::Input),
             4 => Ok(Self::Output),
             5 => Ok(Self::JumpNotZero),
+            6 => Ok(Self::JumpZero),
             99 => Ok(Self::Halt),
             _ => Err(format!("unsupported opcode {}", value)),
         }
@@ -52,6 +54,7 @@ impl Opcode {
             Self::Input => [Some(ParamMode::Immediate), None, None],
             Self::Output => [None, None, None],
             Self::JumpNotZero => [None, None, None],
+            Self::JumpZero => [None, None, None],
             _ => [None, None, None],
         }
     }
@@ -106,6 +109,7 @@ impl VM {
                 Opcode::Input => self.exec_input(input, instruction.modes)?,
                 Opcode::Output => self.exec_output(output, instruction.modes)?,
                 Opcode::JumpNotZero => self.exec_jump_not_zero(instruction.modes)?,
+                Opcode::JumpZero => self.exec_jump_zero(instruction.modes)?,
                 Opcode::Halt => break,
                 _ => todo!("unimplemented"),
             }
@@ -232,6 +236,17 @@ impl VM {
 
         Ok(())
     }
+
+    fn exec_jump_zero(&mut self, modes: [ParamMode; 3]) -> Result<(), String> {
+        let (x, addr) = self.read_params2(modes)?;
+        self.ip += 3;
+
+        if x == 0 {
+            self.ip = addr as usize;
+        }
+
+        Ok(())
+    }
 }
 
 #[aoc_generator(day5)]
@@ -336,6 +351,11 @@ mod tests {
 
     #[test]
     fn test_jump_not_zero() {
-        assert_eq!(run(&vec![1105, 1, 4, 99, 1, 1, 1, 0]), 2);
+        assert_eq!(run(&vec![1105, 1, 4, 99, 1101, 1, 1, 0]), 2);
+    }
+
+    #[test]
+    fn test_jump_zero() {
+        assert_eq!(run(&vec![1106, 0, 4, 99, 1101, 1, 1, 0]), 2);
     }
 }
