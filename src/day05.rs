@@ -26,6 +26,7 @@ enum Opcode {
     Halt,
     Input,
     Output,
+    JumpNotZero,
 }
 
 impl TryFrom<i64> for Opcode {
@@ -36,6 +37,7 @@ impl TryFrom<i64> for Opcode {
             2 => Ok(Self::Mul),
             3 => Ok(Self::Input),
             4 => Ok(Self::Output),
+            5 => Ok(Self::JumpNotZero),
             99 => Ok(Self::Halt),
             _ => Err(format!("unsupported opcode {}", value)),
         }
@@ -49,6 +51,7 @@ impl Opcode {
             Self::Mul => [None, None, Some(ParamMode::Immediate)],
             Self::Input => [Some(ParamMode::Immediate), None, None],
             Self::Output => [None, None, None],
+            Self::JumpNotZero => [None, None, None],
             _ => [None, None, None],
         }
     }
@@ -102,6 +105,7 @@ impl VM {
                 Opcode::Mul => self.exec_mul(instruction.modes)?,
                 Opcode::Input => self.exec_input(input, instruction.modes)?,
                 Opcode::Output => self.exec_output(output, instruction.modes)?,
+                Opcode::JumpNotZero => self.exec_jump_not_zero(instruction.modes)?,
                 Opcode::Halt => break,
                 _ => todo!("unimplemented"),
             }
@@ -141,6 +145,18 @@ impl VM {
         }
 
         Ok((params[0], params[1], params[2]))
+    }
+
+    fn read_params2(&mut self, modes: [ParamMode; 3]) -> Result<(i64, i64), String> {
+        let mut params = [self.read_mem(self.ip + 1)?, self.read_mem(self.ip + 2)?];
+
+        for i in 0..params.len() {
+            if modes[i] == ParamMode::Position {
+                params[i] = self.read_mem(params[i] as usize)?;
+            }
+        }
+
+        Ok((params[0], params[1]))
     }
 
     fn read_params1(&mut self, modes: [ParamMode; 3]) -> Result<i64, String> {
@@ -203,6 +219,17 @@ impl VM {
         self.write_mem(x as usize, value)?;
 
         self.ip += 2;
+        Ok(())
+    }
+
+    fn exec_jump_not_zero(&mut self, modes: [ParamMode; 3]) -> Result<(), String> {
+        let (x, addr) = self.read_params2(modes)?;
+        self.ip += 3;
+
+        if x != 0 {
+            self.ip = addr as usize;
+        }
+
         Ok(())
     }
 }
@@ -305,5 +332,10 @@ mod tests {
             run_with_buffers(&vec![3, 2, 0, 1, 1, 0], "1101", &mut buffer),
             2
         );
+    }
+
+    #[test]
+    fn test_jump_not_zero() {
+        assert_eq!(run(&vec![1105, 1, 4, 99, 1, 1, 1, 0]), 2);
     }
 }
