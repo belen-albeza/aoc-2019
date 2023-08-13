@@ -23,6 +23,8 @@ enum Opcode {
     Add,
     Mul,
     Halt,
+    Input,
+    Output,
 }
 
 impl TryFrom<i64> for Opcode {
@@ -31,6 +33,8 @@ impl TryFrom<i64> for Opcode {
         match value {
             1 => Ok(Self::Add),
             2 => Ok(Self::Mul),
+            3 => Ok(Self::Input),
+            4 => Ok(Self::Output),
             99 => Ok(Self::Halt),
             _ => Err(format!("unsupported opcode {}", value)),
         }
@@ -84,7 +88,7 @@ impl VM {
                 Opcode::Add => self.exec_add(instruction.modes2())?,
                 Opcode::Mul => self.exec_mul(instruction.modes2())?,
                 Opcode::Halt => break,
-                // _ => todo!("unimplemented"),
+                _ => todo!("unimplemented"),
             }
         }
 
