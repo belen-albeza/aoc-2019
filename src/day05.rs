@@ -42,6 +42,18 @@ impl TryFrom<i64> for Opcode {
     }
 }
 
+impl Opcode {
+    pub fn modes_mask(&self) -> [Option<ParamMode>; 3] {
+        match self {
+            Self::Add => [None, None, Some(ParamMode::Immediate)],
+            Self::Mul => [None, None, Some(ParamMode::Immediate)],
+            Self::Input => [Some(ParamMode::Immediate), None, None],
+            Self::Output => [None, None, None],
+            _ => [None, None, None],
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Copy)]
 struct Instruction {
     opcode: Opcode,
@@ -53,21 +65,14 @@ impl TryFrom<i64> for Instruction {
     fn try_from(value: i64) -> Result<Self, Self::Error> {
         let opcode = Opcode::try_from(value % 100)?;
         let mut modes = [ParamMode::Position; 3];
+
         for i in 0..modes.len() {
             let raw_mode = (value % 10_i64.pow(3 + i as u32)) / 10_i64.pow(2 + i as u32);
-            modes[i] = ParamMode::try_from(raw_mode)?;
+            let unmasked_mode = ParamMode::try_from(raw_mode)?;
+            modes[i] = opcode.modes_mask()[i].unwrap_or(unmasked_mode);
         }
 
         Ok(Self { opcode, modes })
-    }
-}
-
-impl Instruction {
-    pub fn modes2(&self) -> [ParamMode; 3] {
-        [self.modes[0], self.modes[1], ParamMode::Immediate]
-    }
-    pub fn modes1(&self) -> [ParamMode; 3] {
-        [self.modes[0], ParamMode::Immediate, ParamMode::Immediate]
     }
 }
 
@@ -92,16 +97,14 @@ impl VM {
     ) -> Result<i64, String> {
         while let Some(raw_instruction) = self.memory.get(self.ip) {
             let instruction = Instruction::try_from(*raw_instruction)?;
-            println!("Running {:?}", instruction);
             match instruction.opcode {
-                Opcode::Add => self.exec_add(instruction.modes2())?,
-                Opcode::Mul => self.exec_mul(instruction.modes2())?,
-                Opcode::Input => self.exec_input(input, instruction.modes1())?,
-                Opcode::Output => self.exec_output(output, instruction.modes1())?,
+                Opcode::Add => self.exec_add(instruction.modes)?,
+                Opcode::Mul => self.exec_mul(instruction.modes)?,
+                Opcode::Input => self.exec_input(input, instruction.modes)?,
+                Opcode::Output => self.exec_output(output, instruction.modes)?,
                 Opcode::Halt => break,
                 _ => todo!("unimplemented"),
             }
-            println!("\t-> {:?}", self.memory);
         }
 
         Ok(*self.memory.get(0).unwrap_or(&0))
@@ -191,16 +194,11 @@ impl VM {
         input
             .read_to_string(&mut buffer)
             .map_err(|x| format!("{}", x))?;
-        println!("buffer = {}", buffer);
 
         let value: i64 = buffer
             .parse()
             .map_err(|_| format!("invalid input: {}", buffer))?;
-        let x = self.read_params1([
-            ParamMode::Immediate,
-            ParamMode::Position,
-            ParamMode::Position,
-        ])?;
+        let x = self.read_params1(modes)?;
 
         self.write_mem(x as usize, value)?;
 
@@ -214,6 +212,15 @@ pub fn parse_input(input: &str) -> Vec<i64> {
     input.split(",").map(|x| x.parse().unwrap()).collect()
 }
 
+#[aoc(day5, part1)]
+pub fn solve_part1(src: &[i64]) -> Result<String, String> {
+    let mut output = vec![];
+    let mut vm = VM::new(src);
+    vm.run(&mut "1".as_bytes(), &mut output)?;
+
+    Ok(String::from_utf8(output).unwrap())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -222,9 +229,6 @@ mod tests {
         // io::stdin.lock()
         // io::stdout()
         run_with_buffers(src, "", &mut vec![])
-
-        // let mut vm = VM::new(src);
-        // vm.run(&input.as_bytes(), &mut output).unwrap()
     }
 
     fn run_with_buffers(src: &[i64], input: &str, output: &mut impl io::Write) -> i64 {
@@ -245,15 +249,30 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_instruction() {
+    fn test_parse_instruction_unmasked() {
         assert_eq!(
-            Instruction::try_from(1002),
+            Instruction::try_from(1004),
             Ok(Instruction {
-                opcode: Opcode::Mul,
+                opcode: Opcode::Output,
                 modes: [
                     ParamMode::Position,
                     ParamMode::Immediate,
                     ParamMode::Position
+                ]
+            })
+        );
+    }
+
+    #[test]
+    fn test_parse_instruction_masked() {
+        assert_eq!(
+            Instruction::try_from(1001),
+            Ok(Instruction {
+                opcode: Opcode::Add,
+                modes: [
+                    ParamMode::Position,
+                    ParamMode::Immediate,
+                    ParamMode::Immediate,
                 ]
             })
         );
