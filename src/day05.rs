@@ -28,6 +28,8 @@ enum Opcode {
     Output,
     JumpNotZero,
     JumpZero,
+    Less,
+    Equal,
 }
 
 impl TryFrom<i64> for Opcode {
@@ -40,6 +42,8 @@ impl TryFrom<i64> for Opcode {
             4 => Ok(Self::Output),
             5 => Ok(Self::JumpNotZero),
             6 => Ok(Self::JumpZero),
+            7 => Ok(Self::Less),
+            8 => Ok(Self::Equal),
             99 => Ok(Self::Halt),
             _ => Err(format!("unsupported opcode {}", value)),
         }
@@ -52,9 +56,8 @@ impl Opcode {
             Self::Add => [None, None, Some(ParamMode::Immediate)],
             Self::Mul => [None, None, Some(ParamMode::Immediate)],
             Self::Input => [Some(ParamMode::Immediate), None, None],
-            Self::Output => [None, None, None],
-            Self::JumpNotZero => [None, None, None],
-            Self::JumpZero => [None, None, None],
+            Self::Less => [None, None, Some(ParamMode::Immediate)],
+            Self::Equal => [None, None, Some(ParamMode::Immediate)],
             _ => [None, None, None],
         }
     }
@@ -110,8 +113,9 @@ impl VM {
                 Opcode::Output => self.exec_output(output, instruction.modes)?,
                 Opcode::JumpNotZero => self.exec_jump_not_zero(instruction.modes)?,
                 Opcode::JumpZero => self.exec_jump_zero(instruction.modes)?,
+                Opcode::Less => self.exec_less(instruction.modes)?,
+                Opcode::Equal => self.exec_equal(instruction.modes)?,
                 Opcode::Halt => break,
-                _ => todo!("unimplemented"),
             }
         }
 
@@ -247,6 +251,22 @@ impl VM {
 
         Ok(())
     }
+
+    fn exec_less(&mut self, modes: [ParamMode; 3]) -> Result<(), String> {
+        let (x, y, addr) = self.read_params3(modes)?;
+        self.write_mem(addr as usize, (x < y) as i64)?;
+
+        self.ip += 4;
+        Ok(())
+    }
+
+    fn exec_equal(&mut self, modes: [ParamMode; 3]) -> Result<(), String> {
+        let (x, y, addr) = self.read_params3(modes)?;
+        self.write_mem(addr as usize, (x == y) as i64)?;
+
+        self.ip += 4;
+        Ok(())
+    }
 }
 
 #[aoc_generator(day5)]
@@ -259,6 +279,15 @@ pub fn solve_part1(src: &[i64]) -> Result<String, String> {
     let mut output = vec![];
     let mut vm = VM::new(src);
     vm.run(&mut "1".as_bytes(), &mut output)?;
+
+    Ok(String::from_utf8(output).unwrap())
+}
+
+#[aoc(day5, part2)]
+pub fn solve_part2(src: &[i64]) -> Result<String, String> {
+    let mut output = vec![];
+    let mut vm = VM::new(src);
+    vm.run(&mut "5".as_bytes(), &mut output)?;
 
     Ok(String::from_utf8(output).unwrap())
 }
@@ -321,7 +350,7 @@ mod tests {
     }
 
     #[test]
-    fn test_run_backward_compatibility() {
+    fn test_run_day02() {
         assert_eq!(run(&vec![1, 0, 0, 0, 99]), 2);
         assert_eq!(run(&vec![2, 3, 0, 3, 99]), 2);
         assert_eq!(run(&vec![2, 4, 4, 5, 99, 0]), 2);
@@ -350,12 +379,67 @@ mod tests {
     }
 
     #[test]
-    fn test_jump_not_zero() {
-        assert_eq!(run(&vec![1105, 1, 4, 99, 1101, 1, 1, 0]), 2);
+    fn test_jumps_with_position_mode() {
+        // 3,12,6,12,15,1,13,14,13,4,13,99,-1,0,1,9
+        let mut buffer = vec![];
+        run_with_buffers(
+            &vec![3, 12, 6, 12, 15, 1, 13, 14, 13, 4, 13, 99, -1, 0, 1, 9],
+            "0",
+            &mut buffer,
+        );
+        assert_eq!(String::from_utf8(buffer).unwrap(), "0\n");
+
+        let mut buffer2 = vec![];
+        run_with_buffers(
+            &vec![3, 12, 6, 12, 15, 1, 13, 14, 13, 4, 13, 99, -1, 0, 1, 9],
+            "8",
+            &mut buffer2,
+        );
+        assert_eq!(String::from_utf8(buffer2).unwrap(), "1\n");
     }
 
     #[test]
-    fn test_jump_zero() {
-        assert_eq!(run(&vec![1106, 0, 4, 99, 1101, 1, 1, 0]), 2);
+    fn test_jumps_with_immediate_mode() {
+        let mut buffer = vec![];
+        run_with_buffers(
+            &vec![3, 3, 1105, -1, 9, 1101, 0, 0, 12, 4, 12, 99, 1],
+            "0",
+            &mut buffer,
+        );
+        assert_eq!(String::from_utf8(buffer).unwrap(), "0\n");
+
+        let mut buffer2 = vec![];
+        run_with_buffers(
+            &vec![3, 3, 1105, -1, 9, 1101, 0, 0, 12, 4, 12, 99, 1],
+            "8",
+            &mut buffer2,
+        );
+        assert_eq!(String::from_utf8(buffer2).unwrap(), "1\n");
+    }
+
+    #[test]
+    fn test_equals_with_position_mode() {
+        let mut buffer = vec![];
+        run_with_buffers(&vec![3, 9, 8, 9, 10, 9, 4, 9, 99, -1, 8], "8", &mut buffer);
+        assert_eq!(String::from_utf8(buffer).unwrap(), "1\n");
+
+        let mut buffer2 = vec![];
+        run_with_buffers(
+            &vec![3, 9, 8, 9, 10, 9, 4, 9, 99, -1, 8],
+            "-8",
+            &mut buffer2,
+        );
+        assert_eq!(String::from_utf8(buffer2).unwrap(), "0\n");
+    }
+
+    #[test]
+    fn test_less_with_immediate_mode() {
+        let mut buffer1 = vec![];
+        run_with_buffers(&vec![3, 3, 1107, -1, 8, 3, 4, 3, 99], "7", &mut buffer1);
+        assert_eq!(String::from_utf8(buffer1).unwrap(), "1\n");
+
+        let mut buffer2 = vec![];
+        run_with_buffers(&vec![3, 3, 1107, -1, 8, 3, 4, 3, 99], "8", &mut buffer2);
+        assert_eq!(String::from_utf8(buffer2).unwrap(), "0\n");
     }
 }
